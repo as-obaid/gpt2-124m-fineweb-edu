@@ -18,3 +18,9 @@ TRAIN_ARGS=(
 )
 # Val loss uses the first 160 x 64 x 1024 = 10.5M tokens of the val shard. build-nanogpt evaluates
 # 20 batches of 64 x 1024 on each of 8 GPUs, which is exactly these tokens, so the numbers compare.
+
+# Never let an 8-hour segment and a 1-hour chunk train at the same time. Sourced here, not from
+# train.sbatch, so segments that were already queued pick it up when they start.
+source "$ROOT/scripts/train_guard.sh"
+# Progress figures every 500 steps, in logs/figs (see progress_plot.sh).
+source "$ROOT/scripts/progress_plot.sh"

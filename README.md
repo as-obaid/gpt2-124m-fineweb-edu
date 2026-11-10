@@ -13,7 +13,11 @@
 GPT-2 124M trained from scratch on three epochs of FineWeb-Edu sample-10BT (29.6B tokens) on a single H200. The training code is Andrej Karpathy's [llm.c](https://github.com/karpathy/llm.c), unmodified, included as a git submodule. This repo holds the rest: data preparation, the build, Slurm jobs, evaluation and results.
 
 > [!NOTE]
-> Training has not started yet. The results below will be filled in as the run progresses.
+> Training is in progress: step 14,500 of 56,352 (26%), 7.6B of 29.6B tokens. At that step val loss is 3.176 and HellaSwag 29.2%, after a best of 29.7% at step 12,500. The snapshot below is from step 14,500; the final results will replace it when the run ends.
+
+<p align="center">
+  <img src="results/figures/monitor14500.png" alt="Loss and HellaSwag accuracy at step 14,500 of 56,352" width="100%">
+</p>
 
 ## Results
 
@@ -72,6 +76,7 @@ $PY -I scripts/download_gpt2_and_hellaswag.py    # tokenizer, GPT-2 baseline, He
 sbatch scripts/tokenize_fineweb_edu_10bt.sbatch  # ~30 min on 64 CPUs
 sbatch scripts/smoke_test.sbatch                 # build, baseline, 200 steps, resume check
 bash scripts/submit_train.sh                     # 4 chained 8-hour training jobs
+bash scripts/submit_chunks.sh                    # optional: 1-hour H100 jobs while those queue
 ```
 
 Compute nodes have no internet, so the downloads come first. Training writes `runs/gpt2_124m_3ep/main.log` with metrics, plus a checkpoint every 500 steps; each job resumes from the newest checkpoint.
