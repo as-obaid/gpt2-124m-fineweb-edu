@@ -3,7 +3,7 @@
 #SBATCH --partition=gpu
 #SBATCH --gres=gpu:h200:1
 #SBATCH --cpus-per-task=8
-#SBATCH --mem=64G
+#SBATCH --mem=32G
 #SBATCH --time=01:00:00
 #SBATCH --output=logs/%x_%j.out
 #SBATCH --error=logs/%x_%j.err
@@ -15,6 +15,11 @@
 #  3. Train 200 steps (run A) with the real run's flags.
 #  4. Resume a second run (B) from A's step-100 checkpoint. Steps 101-200 must match A exactly.
 set -euo pipefail
+# Submitted to more than one queue? The first copy to start cancels the others.
+scancel --me --name="$SLURM_JOB_NAME" --state=PENDING
+if squeue --me --name="$SLURM_JOB_NAME" -t RUNNING -h -o %i | grep -vqx "$SLURM_JOB_ID"; then
+  echo "another $SLURM_JOB_NAME job is already running, exiting"; exit 0
+fi
 source "$SLURM_SUBMIT_DIR/env.sh"
 source "$ROOT/scripts/train_flags.sh"
 A=$RUNS_DIR/smoke_a
