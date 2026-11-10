@@ -1,0 +1,17 @@
+# Data, runs and caches stay on the cluster.
+data/
+runs/
+.cache/
+.venv/
+logs/*
+!logs/.gitkeep
+
+# Fetched by scripts/setup.sh at a pinned commit.
+cudnn-frontend/
+
+# Your own settings (Slurm account, paths).
+env.local.sh
+
+__pycache__/
+*.pyc
+.DS_Store
