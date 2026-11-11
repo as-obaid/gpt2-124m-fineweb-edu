@@ -7,9 +7,10 @@
 #                loses only the steps since its last checkpoint: llm.c writes DONE_<step> after a
 #                checkpoint is whole, and it has no SIGTERM handler, so it dies when cancelled.
 # gpt2fwe_chunk  1-hour segments on sharing (submit_chunks.sh). One that starts while a segment
-#                runs cancels the queued chunks and exits, which ends the chain. Otherwise it
-#                queues one successor behind itself (if none is queued), so the chain keeps going
-#                until a segment starts. One that starts while another chunk runs exits.
+#                runs cancels the queued chunks and exits, which ends the chain. Otherwise, once
+#                it has run for 5 minutes, it queues one successor behind itself (if none is
+#                queued), so the chain keeps going until a segment starts or the run is finished.
+#                One that starts while another chunk runs exits.
 #
 # If squeue keeps failing (the controller is overloaded), a chunk exits rather than guess, and a
 # segment cancels every chunk by name and trains. A cancelled or timed-out chunk can sit in
@@ -20,6 +21,7 @@ GUARD_CHUNK_JOB=gpt2fwe_chunk
 GUARD_WAIT_SECONDS=${GUARD_WAIT_SECONDS:-120}
 GUARD_SQUEUE_TRIES=${GUARD_SQUEUE_TRIES:-6}
 GUARD_RETRY_SLEEP=${GUARD_RETRY_SLEEP:-10}
+GUARD_SUCCESSOR_DELAY=${GUARD_SUCCESSOR_DELAY:-300}
 
 guard_jobs() {  # my jobs named $1 in states $2, other than this one; fails if squeue keeps failing
   local out
@@ -59,6 +61,12 @@ case "${SLURM_JOB_NAME:-}" in
     guard_wait_for_chunks
     ;;
   "$GUARD_CHUNK_JOB")
+    # train.sbatch only checks for a finished run after this file, so stop here, or every chunk
+    # would queue another one forever after the last step.
+    if [ -e "$RUNS_DIR/gpt2_124m_3ep/DONE_$(printf %08d "$MAX_STEPS")" ]; then
+      echo "guard: the run is finished; not queuing another chunk"
+      exit 0
+    fi
     if ! guard_segments=$(guard_jobs "$GUARD_TRAIN_JOB" RUNNING,COMPLETING) \
        || ! guard_others=$(guard_jobs "$GUARD_CHUNK_JOB" RUNNING); then
       echo "guard: cannot ask Slurm what else is running; exiting rather than risk two writers" >&2
@@ -74,9 +82,15 @@ case "${SLURM_JOB_NAME:-}" in
       exit 0
     fi
     guard_wait_for_chunks
-    if guard_pending=$(guard_jobs "$GUARD_CHUNK_JOB" PENDING) && [ -z "$guard_pending" ]; then
-      bash "$ROOT/scripts/submit_chunks.sh" 1 "${CHUNK_GPU:-h100}" \
-        || echo "guard: could not queue the next chunk; this one trains anyway" >&2
-    fi
+    # Queue the successor only after this chunk has run for GUARD_SUCCESSOR_DELAY seconds. Slurm
+    # kills a job's leftover processes when it ends, so a chunk that crashes at startup (say, on a
+    # checkpoint llm.c can't resume from) queues nothing instead of looping through the queue.
+    (
+      sleep "$GUARD_SUCCESSOR_DELAY"
+      if guard_pending=$(guard_jobs "$GUARD_CHUNK_JOB" PENDING) && [ -z "$guard_pending" ]; then
+        bash "$ROOT/scripts/submit_chunks.sh" 1 "${CHUNK_GPU:-h100}" \
+          || echo "guard: could not queue the next chunk; this one trains anyway" >&2
+      fi
+    ) &
     ;;
 esac
