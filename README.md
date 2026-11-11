@@ -13,10 +13,10 @@
 GPT-2 124M trained from scratch on three epochs of FineWeb-Edu sample-10BT (29.6B tokens) on a single H200. The training code is Andrej Karpathy's [llm.c](https://github.com/karpathy/llm.c), unmodified, included as a git submodule. This repo holds the rest: data preparation, the build, Slurm jobs, evaluation and results.
 
 > [!NOTE]
-> Training is in progress: step 14,500 of 56,352 (26%), 7.6B of 29.6B tokens. At that step val loss is 3.176 and HellaSwag 29.2%, after a best of 29.7% at step 12,500. The snapshot below is from step 14,500; the final results will replace it when the run ends.
+> Training is in progress: step 21,500 of 56,352 (38%), 11.3B of 29.6B tokens, in the second of three epochs. At that step val loss is 3.121 and HellaSwag 29.9%. The best HellaSwag so far is 30.4% at step 20,500, above OpenAI's GPT-2 124M (29.55%). The snapshot below is from step 21,500; the final results will replace it when the run ends.
 
 <p align="center">
-  <img src="results/figures/monitor14500.png" alt="Loss and HellaSwag accuracy at step 14,500 of 56,352" width="100%">
+  <img src="results/figures/monitor21500.png" alt="Loss and HellaSwag accuracy at step 21,500 of 56,352" width="100%">
 </p>
 
 ## Results
