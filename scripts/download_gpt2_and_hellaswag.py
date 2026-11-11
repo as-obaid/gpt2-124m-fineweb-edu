@@ -28,6 +28,9 @@ print("tiktoken gpt2 files cached in", os.environ["TIKTOKEN_CACHE_DIR"])
 
 path = snapshot_download("openai-community/gpt2", allow_patterns=["*.json", "*.txt", "*.safetensors"])
 print("GPT-2 124M weights in", path)
+# llm.c's dev/eval/export_hf.py loads the tokenizer as "gpt2", which the cache keeps apart from
+# openai-community/gpt2, so export_hf.py would fail offline without this copy.
+snapshot_download("gpt2", allow_patterns=["*.json", "*.txt"])
 
 FIELDS = ["ind", "activity_label", "ctx_a", "ctx_b", "ctx", "split", "split_type", "label", "endings", "source_id"]
 parquet = hf_hub_download(
