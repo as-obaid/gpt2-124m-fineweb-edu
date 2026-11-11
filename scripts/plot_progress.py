@@ -87,7 +87,10 @@ def main():
     train, val, hella = data["trl"], data["tel"], data["eval"]
     if not train:
         sys.exit(f"no training steps in {log_path}")
-    step = train[-1][0]
+    # the last step only evaluates, so it logs val and HellaSwag but no train loss
+    step = max(points[-1][0] for points in (train, val, hella) if points)
+    # many evals: smaller markers, so they don't hide the train line
+    marker = 6 if len(val) <= 40 else 3
 
     fig, (ax_loss, ax_hs) = plt.subplots(1, 2, figsize=(12, 4.6), facecolor=SURFACE)
     parts = [f"step {step:,} of {TOTAL_STEPS:,}", f"{step * TOKENS_PER_STEP / 1e9:.2f}B tokens"]
@@ -109,13 +112,15 @@ def main():
         below = smooth[-1][1] <= (val_shown[-1][1] if val_shown else smooth[-1][1])
         end_label(ax_loss, *smooth[-1], f"{smooth[-1][1]:.3f}", -gap if below else gap)
     if val_shown:
-        ax_loss.plot(*zip(*val_shown), color=ORANGE, linewidth=2, marker="o", markersize=6,
-                     markeredgecolor=SURFACE, markeredgewidth=2, label="val")
+        ax_loss.plot(*zip(*val_shown), color=ORANGE, linewidth=2, marker="o", markersize=marker,
+                     markeredgecolor=SURFACE, markeredgewidth=marker / 3, label="val")
         above = not smooth or val_shown[-1][1] > smooth[-1][1]
         end_label(ax_loss, *val_shown[-1], f"{val_shown[-1][1]:.3f}", gap if above else -gap)
     shown = [v for _, v in smooth] + [v for _, v in val_shown]
     if shown:
-        ax_loss.set_ylim(min(shown) - 0.1, min(max(shown), 7.0) + 0.1)
+        # once val loss is under 3.5, cut off the first steps so the slow part stays readable
+        cap = 4.0 if val_shown and val_shown[-1][1] < 3.5 else 7.0
+        ax_loss.set_ylim(min(shown) - 0.1, min(max(shown), cap) + 0.1)
     ax_loss.set_title("Loss", color=INK, fontsize=11, loc="left")
     ax_loss.set_xlabel("step")
     ax_loss.legend(frameon=False, fontsize=9, labelcolor=INK)
@@ -123,16 +128,17 @@ def main():
     # HellaSwag: one series, against chance and the OpenAI GPT-2 124M score.
     style(ax_hs)
     ax_hs.axhline(0.25, color=AXIS, linewidth=1, linestyle=":")
-    ax_hs.annotate("chance 25%", (0, 0.25), xytext=(2, -11), textcoords="offset points",
-                   xycoords=("axes fraction", "data"), fontsize=8, color=MUTED)
+    # reference labels sit at the right end, below their lines, where accuracy has risen past them
+    ax_hs.annotate("chance 25%", (1, 0.25), xytext=(-2, -11), textcoords="offset points",
+                   xycoords=("axes fraction", "data"), ha="right", fontsize=8, color=MUTED)
     if baseline:
         ax_hs.axhline(baseline, color=MUTED, linewidth=1, linestyle="--")
-        ax_hs.annotate(f"OpenAI GPT-2 124M {baseline:.1%}", (0, baseline), xytext=(2, 4),
+        ax_hs.annotate(f"OpenAI GPT-2 124M {baseline:.1%}", (1, baseline), xytext=(-2, -11),
                        textcoords="offset points", xycoords=("axes fraction", "data"),
-                       fontsize=8, color=MUTED)
+                       ha="right", fontsize=8, color=MUTED)
     if hella:
-        ax_hs.plot(*zip(*hella), color=BLUE, linewidth=2, marker="o", markersize=6,
-                   markeredgecolor=SURFACE, markeredgewidth=2)
+        ax_hs.plot(*zip(*hella), color=BLUE, linewidth=2, marker="o", markersize=marker,
+                   markeredgecolor=SURFACE, markeredgewidth=marker / 3)
         end_label(ax_hs, *hella[-1], f"{hella[-1][1]:.1%}")
     top = max([v for _, v in hella] + [baseline or 0.25]) + 0.01
     ax_hs.set_ylim(0.23, max(top, 0.31))
