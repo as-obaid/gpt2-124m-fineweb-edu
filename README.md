@@ -1,12 +1,12 @@
 <p align="center">
-  <img src="assets/banner.svg" alt="gpt2-124m-fineweb-edu: GPT-2 124M trained from scratch for 3 epochs of FineWeb-Edu on one H200, with Karpathy's llm.c" width="100%">
+  <img src="assets/banner.svg" alt="gpt2-124m-fineweb-edu: GPT-2 124M trained from scratch for 3 epochs of FineWeb-Edu on one H200 or H100, with Karpathy's llm.c" width="100%">
 </p>
 
 <p align="center">
   <a href="https://github.com/karpathy/llm.c"><img alt="code: llm.c" src="https://img.shields.io/badge/code-llm.c-24292f"></a>
   <a href="https://huggingface.co/datasets/HuggingFaceFW/fineweb-edu"><img alt="data: FineWeb-Edu sample-10BT" src="https://img.shields.io/badge/data-FineWeb--Edu%2010BT-f59e0b"></a>
-  <img alt="GPU: 1x H200" src="https://img.shields.io/badge/GPU-1%C3%97%20H200-76b900">
-  <img alt="Hugging Face: model coming soon" src="https://img.shields.io/badge/%F0%9F%A4%97%20Hugging%20Face-model%20coming%20soon-ffd21e">
+  <img alt="GPU: 1x H200 or H100" src="https://img.shields.io/badge/GPU-1%C3%97%20H200%20or%20H100-76b900">
+  <a href="https://huggingface.co/as-obaid/gpt2-124m-fineweb-edu"><img alt="Hugging Face: as-obaid/gpt2-124m-fineweb-edu" src="https://img.shields.io/badge/%F0%9F%A4%97%20Hugging%20Face-model-ffd21e"></a>
   <a href="LICENSE"><img alt="license: MIT" src="https://img.shields.io/badge/license-MIT-2563eb"></a>
 </p>
 
@@ -27,6 +27,18 @@ HellaSwag first passes OpenAI's GPT-2 124M at step 12,500 (6.6B tokens) and stay
 </p>
 
 <sub><sup>1</sup> 3 epochs with build-nanogpt on 4× RTX 4070, as reported. Val loss is mean cross-entropy on the first 10.5M tokens of the held-out val shard (the first 100M tokens of sample-10BT): the same tokens build-nanogpt evaluates on 8 GPUs. HellaSwag is acc_norm on all 10,042 validation examples.</sub>
+
+## Use the model
+
+The weights are on Hugging Face at [as-obaid/gpt2-124m-fineweb-edu](https://huggingface.co/as-obaid/gpt2-124m-fineweb-edu), as a Transformers model and as the original llm.c checkpoint.
+
+```python
+from transformers import pipeline
+
+generate = pipeline("text-generation", model="as-obaid/gpt2-124m-fineweb-edu")
+out = generate("During photosynthesis in green plants", max_new_tokens=60, do_sample=True, top_k=50)
+print(out[0]["generated_text"])
+```
 
 ## Setup
 
@@ -71,9 +83,14 @@ sbatch scripts/tokenize_fineweb_edu_10bt.sbatch  # ~30 min on 64 CPUs
 sbatch scripts/smoke_test.sbatch                 # build, baseline, 200 steps, resume check
 bash scripts/submit_train.sh                     # 4 chained 8-hour training jobs
 bash scripts/submit_chunks.sh                    # optional: 1-hour H100 jobs while those queue
+
+# after the last step: convert to Hugging Face format, check the loss, upload
+sbatch -p short -c 8 --mem=32G -t 30 --wrap \
+  "HF_HUB_OFFLINE=1 $PY -I scripts/export_hf.py runs/gpt2_124m_3ep/model_00056352.bin runs/hf"
+$VENV/bin/hf upload <you>/gpt2-124m-fineweb-edu runs/hf   # on a login node, after hf auth login
 ```
 
-Compute nodes have no internet, so the downloads come first. Training writes `runs/gpt2_124m_3ep/main.log` with metrics, plus a checkpoint every 500 steps; each job resumes from the newest checkpoint.
+Compute nodes have no internet, so the downloads come first. Training writes `runs/gpt2_124m_3ep/main.log` with metrics, plus a checkpoint every 500 steps; each job resumes from the newest checkpoint. This run's log is [`results/main.log`](results/main.log), and [`plot_progress.py`](scripts/plot_progress.py) draws the figure from it.
 
 <details>
 <summary><b>Running llm.c unmodified</b></summary>
@@ -92,7 +109,8 @@ Compute nodes have no internet, so the downloads come first. Training writes `ru
 llm.c/        submodule: karpathy/llm.c @ f1e2ace, unmodified
 env.sh        shared paths and pinned versions (overrides in env.local.sh)
 scripts/      setup, downloads, tokenizing, build, smoke test, training
-results/      logs, figures and summary
+results/      training log, figure and the Hugging Face model card
+tests/        tests for the training guard: bash tests/test_train_guard.sh
 assets/       README images
 ```
 
